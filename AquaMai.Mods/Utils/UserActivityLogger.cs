@@ -26,7 +26,7 @@ namespace AquaMai.Mods.Utils
         [HarmonyPatch(typeof(PacketUserLogin))]
         [HarmonyPatch(MethodType.Constructor)]
         [HarmonyPatch(new Type[] { typeof(ulong), typeof(string), typeof(bool), typeof(int), typeof(Action<UserLoginResponseVO>), typeof(Action<PacketStatus>) })]
-        public static class UserActivityLoggerPatch
+        public static class UserLoginActivityLoggerPatch
         {
             [HarmonyPostfix]
             public static void Postfix(PacketUserLogin __instance, ulong userId, string acsessCode, bool isContinue, int genericFlag, Action<UserLoginResponseVO> onDone, Action<PacketStatus> onError)
@@ -36,13 +36,22 @@ namespace AquaMai.Mods.Utils
             }
         }
 
+        [HarmonyPatch(typeof(PacketUserLogout))]
+        [HarmonyPatch(MethodType.Constructor)]
+        [HarmonyPatch(new Type[] {typeof(ulong),typeof(LogoutType),typeof(string),typeof(Action),typeof(Action<PacketStatus>)})]
 
-
-
-
-        private static void LogStatistics()
+        public static class UserLogoutActivityLoggerPatch
         {
+            [HarmonyPostfix]
+            public static void PostfixLogout(PacketUserLogout __instance, ulong userId, LogoutType logoutType, string acsessCode, Action onDone, Action<PacketStatus> onError)
+            {
+                DateTime loginTime = DateTime.Now;
+                MelonLogger.Msg($"[UserActivityLogger] ID:{userId} 用户登录：accessCode {acsessCode} 于 {loginTime:yyyy-MM-dd HH:mm:ss}登出");
 
+
+            }
         }
+        
     }
 }
+
