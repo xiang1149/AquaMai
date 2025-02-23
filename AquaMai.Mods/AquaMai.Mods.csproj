@@ -40,8 +40,12 @@
   <ItemGroup>
     <Reference Include="mscorlib" />
     <Reference Include="0Harmony" />
-    <Reference Include="AMDaemon.NET" />
-    <Reference Include="Assembly-CSharp" />
+    <Reference Include="AMDaemon.NET">
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Assembly-CSharp">
+      <Private>False</Private>
+    </Reference>
     <Reference Include="Assembly-CSharp-firstpass" />
     <Reference Include="MelonLoader" />
     <Reference Include="Mono.Cecil" />
