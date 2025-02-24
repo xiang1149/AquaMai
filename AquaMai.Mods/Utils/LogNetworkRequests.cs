@@ -109,11 +109,18 @@ public class LogNetworkRequests
             __instance.State == PacketState.Process &&
             Traverse.Create(__instance).Field("Client").GetValue() is NetHttpClient client)
         {
+
             if (client.State == NetHttpClient.StateDone && !responseErrorOnly)
             {
                 var netQuery = __instance.Query;
                 var api = GetApiName(netQuery);
-                var displayResponse = InspectResponse(api, client.GetResponse().ToArray());
+                if (api == "GetUserPreviewApi")
+                {
+                    MelonLogger.Msg($"[特殊] 触发了");
+                    var getUserPreviewApiResponse = InspectResponse(api, client.GetResponse().ToArray());
+                    MelonLogger.Msg($"[特殊] {api} Response: {getUserPreviewApiResponse}");
+                }
+                    var displayResponse = InspectResponse(api, client.GetResponse().ToArray());
                 MelonLogger.Msg($"[LogNetworkRequests] {api} Response: {displayResponse}");
             }
             else if (client.State == NetHttpClient.StateError)

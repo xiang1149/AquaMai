@@ -54,6 +54,9 @@
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Data.SQLite">
+      <HintPath>E:\game\HDD\System.Data.SQLite.dll</HintPath>
+    </Reference>
     <Reference Include="System.Runtime" />
     <Reference Include="System.Security" />
     <Reference Include="System.Xml" />
@@ -136,6 +139,7 @@
     </PackageReference>
     <PackageReference Include="hidlibrary" Version="3.3.40" />
     <PackageReference Include="ILMerge.Fody" Version="1.24.0" />
+    <PackageReference Include="System.Data.SQLite" Version="1.0.119" />
   </ItemGroup>
 
   <ItemGroup>
