@@ -6,6 +6,9 @@ using Net.Packet.Mai2;
 
 using Net.Packet;
 using Net.VO.Mai2;
+using System.IO;
+using System.Linq;
+using AMDaemon;
 
 
 
@@ -16,8 +19,8 @@ namespace AquaMai.Mods.Utils
     zh: "记录用户登录信息和统计数据")]
     public class UserActivityLogger
     {
-        // 数据库连接字符串
-        private static string connectionString = "Server=localhost;Database=aquamai;User=root;Password=114514;";
+        // CSV 文件路径
+        private static string csvFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "UserData", "user_activity_log.csv");
 
         [HarmonyPatch(typeof(PacketUserLogin))]
         [HarmonyPatch(MethodType.Constructor)]
@@ -28,15 +31,20 @@ namespace AquaMai.Mods.Utils
             public static void Postfix(PacketUserLogin __instance, ulong userId, string acsessCode, bool isContinue, int genericFlag, Action<UserLoginResponseVO> onDone, Action<PacketStatus> onError)
             {
                 DateTime loginTime = DateTime.Now;
-                string sessionId = Guid.NewGuid().ToString();
-                MelonLogger.Msg($"Test执行前");
-                Test.TestMySqlConnection();
-                MelonLogger.Msg($"Test执行后");
-                MelonLogger.Msg($"[UserActivityLogger] ID:{userId} 用户登录：accessCode {acsessCode} 于 {loginTime:yyyy-MM-dd HH:mm:ss} 会话ID: {sessionId}");
-                // 保存登录信息到数据库
-                //SaveUserLoginInfo(userId, acsessCode, loginTime);
-            }
+                MelonLogger.Msg($"[UserActivityLogger] ID:{userId} 用户登录：accessCode {acsessCode} 于 {loginTime:yyyy-MM-dd HH:mm:ss} ");
+                try
+                {
+                    // 标记掉线的记录
+                    MarkDisconnectedUsers(userId, loginTime);
+                    // 保存登录信息到 CSV 文件
+                    SaveUserLoginInfo(userId, acsessCode, loginTime);
+                }
+                catch (Exception ex)
+                {
+                    MelonLogger.Error($"[UserActivityLogger] 发生异常: {ex}");
+                }
 
+            }
 
         }
 
@@ -51,66 +59,94 @@ namespace AquaMai.Mods.Utils
             public static void PostfixLogout(PacketUserLogout __instance, ulong userId, LogoutType logoutType, string acsessCode, Action onDone, Action<PacketStatus> onError)
             {
                 DateTime logoutTime = DateTime.Now;
-                MelonLogger.Msg($"[UserActivityLogger] ID:{userId} 用户登录：accessCode {acsessCode} 于 {logoutTime:yyyy-MM-dd HH:mm:ss}登出");
-                //UpdateUserLogoutInfo(userId, logoutTime);
+                MelonLogger.Msg($"[UserActivityLogger] 触发了UserLogoutActivityLoggerPatch");
+                MelonLogger.Msg($"[UserActivityLogger] ID:{userId} 用户登出：accessCode {acsessCode} 于 {logoutTime:yyyy-MM-dd HH:mm:ss}登出");
+                // 更新登出信息到 CSV 文件
+                UpdateUserLogoutInfo(userId, logoutTime);
             }
         }
 
 
-        // 记录用户登录信息
-        //private static void SaveUserLoginInfo(ulong userId, string accessCode, DateTime loginTime)
-        //{
-        //    using (var connection = new MySqlConnection(connectionString))
-        //    {
-        //        connection.Open();
+        // 保存用户登录信息到 CSV 文件
+        private static void SaveUserLoginInfo(ulong userId, string accessCode, DateTime loginTime)
+        {
+            // 如果文件不存在，创建文件并写入表头
+            if (!File.Exists(csvFilePath))
+            {
+                File.WriteAllText(csvFilePath, "UserId,AccessCode,LoginTime,LogoutTime,HasLoggedOut\n");
+            }
 
-        //        // 关闭所有未登出的旧记录（hasLoggedOut = 1 → 3，表示掉线）
-        //        //string closeOldQuery = "UPDATE user_activity SET hasLoggedOut = 3 WHERE userId = @userId AND hasLoggedOut = 1";
-        //        //using (var cmd = new MySqlCommand(closeOldQuery, connection))
-        //        //{
-        //        //    cmd.Parameters.AddWithValue("@userId", userId);
-        //        //    int rowsAffected = cmd.ExecuteNonQuery();
-        //        //    MelonLogger.Msg($"[UserActivityLogger] 标记 {rowsAffected} 条旧的未登出记录为掉线 (hasLoggedOut = 3) (userId: {userId})");
-        //        //}
+            // 写入登录记录
+            MelonLogger.Msg($"写入登录记录");
+            string logEntry = $"{userId},{accessCode},{loginTime:yyyy-MM-dd HH:mm:ss},,1\n";
+            File.AppendAllText(csvFilePath, logEntry);
+        }
 
-        //        // 插入新的登录记录
-        //        string insertQuery = "INSERT INTO User_Activity (userId, accessCode, loginTime, hasLoggedOut) VALUES (@userId, @accessCode, @loginTime, 1)";
-        //        using (var cmd = new MySqlCommand(insertQuery, connection))
-        //        {
-        //            cmd.Parameters.AddWithValue("@userId", userId);
-        //            cmd.Parameters.AddWithValue("@accessCode", accessCode);
-        //            cmd.Parameters.AddWithValue("@loginTime", loginTime);
-        //            int rowsInserted = cmd.ExecuteNonQuery();
-        //            MelonLogger.Msg($"[UserActivityLogger] 插入 {rowsInserted} 条新的登录记录 (userId: {userId}, accessCode: {accessCode}, loginTime: {loginTime:yyyy-MM-dd HH:mm:ss})");
-        //        }
-        //    }
-        //}
+        // 更新用户登出信息到 CSV 文件
+        private static void UpdateUserLogoutInfo(ulong userId, DateTime logoutTime)
+        {
+            if (!File.Exists(csvFilePath))
+            {
+                MelonLogger.Warning($"[UserActivityLogger] CSV 文件不存在，无法更新登出信息。");
+                return;
+            }
 
-        //// 记录用户登出信息
-        //private static void UpdateUserLogoutInfo(ulong userId, DateTime logoutTime)
-        //{
-        //    using (var connection = new MySqlConnection(connectionString))
-        //    {
-        //        connection.Open();
-        //        // 只更新最近的未登出记录（hasLoggedOut = 1）
-        //        string updateQuery = "UPDATE user_activity SET logoutTime = @logoutTime, hasLoggedOut = 2 WHERE userId = @userId AND hasLoggedOut = 1 ORDER BY loginTime DESC LIMIT 1";
-        //        using (var cmd = new MySqlCommand(updateQuery, connection))
-        //        {
-        //            cmd.Parameters.AddWithValue("@userId", userId);
-        //            cmd.Parameters.AddWithValue("@logoutTime", logoutTime);
-        //            int rowsAffected = cmd.ExecuteNonQuery();
+            // 读取所有行
+            var lines = File.ReadAllLines(csvFilePath).ToList();
 
-        //            if (rowsAffected > 0)
-        //            {
-        //                MelonLogger.Msg($"[UserActivityLogger] 用户 {userId} 的最近登录记录已更新为已登出 (hasLoggedOut = 2), 登出时间: {logoutTime:yyyy-MM-dd HH:mm:ss}");
-        //            }
-        //            else
-        //            {
-        //                MelonLogger.Warning($"[UserActivityLogger] 用户 {userId} 没有找到未登出的记录，可能已掉线");
-        //            }
-        //        }
-        //    }
-        //}
+            // 查找最近的未登出记录
+            for (int i = lines.Count - 1; i >= 0; i--)
+            {
+                var columns = lines[i].Split(',');
+                if (columns.Length >= 5 && ulong.TryParse(columns[0], out ulong recordUserId) && recordUserId == userId && columns[4] == "1")
+                {
+                    // 更新登出时间和状态
+                    columns[3] = logoutTime.ToString("yyyy-MM-dd HH:mm:ss");
+                    columns[4] = "2"; // 标记为已登出
+                    lines[i] = string.Join(",", columns);
+
+                    // 写回文件
+                    File.WriteAllLines(csvFilePath, lines);
+
+                    MelonLogger.Msg($"[UserActivityLogger] 用户 {userId} 的最近登录记录已更新为已登出，登出时间: {logoutTime:yyyy-MM-dd HH:mm:ss}");
+                    return;
+                }
+            }
+
+            MelonLogger.Warning($"[UserActivityLogger] 用户 {userId} 没有找到未登出的记录，可能已掉线"); 
+        }
+
+
+        // **查找并标记掉线用户**
+        private static void MarkDisconnectedUsers(ulong userId, DateTime timeOut)
+        {
+            if (!File.Exists(csvFilePath))
+            {
+                return;
+            }
+
+            var lines = File.ReadAllLines(csvFilePath).ToList();
+            bool updated = false;
+
+            for (int i = lines.Count - 1; i >= 0; i--)
+            {
+                var columns = lines[i].Split(',');
+                if (columns.Length >= 5 && ulong.TryParse(columns[0], out ulong recordUserId) && recordUserId == userId && columns[4] == "1")
+                {
+                    columns[3] = timeOut.ToString("yyyy-MM-dd HH:mm:ss");
+                    columns[4] = "3"; // 标记为掉线
+                    lines[i] = string.Join(",", columns);
+                    updated = true;
+                }
+            }
+
+            if (updated)
+            {
+                File.WriteAllLines(csvFilePath, lines);
+                MelonLogger.Msg($"[UserActivityLogger] 用户 {userId} 掉线记录已标记为 3（掉线）。");
+            }
+        }
+
     }
 }
 
