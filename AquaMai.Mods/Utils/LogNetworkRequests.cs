@@ -116,9 +116,8 @@ public class LogNetworkRequests
                 var api = GetApiName(netQuery);
                 if (api == "GetUserPreviewApi")
                 {
-                    MelonLogger.Msg($"[特殊] 触发了");
                     var getUserPreviewApiResponse = InspectResponse(api, client.GetResponse().ToArray());
-                    MelonLogger.Msg($"[特殊] {api} Response: {getUserPreviewApiResponse}");
+                    LogUserData.parseData(getUserPreviewApiResponse);
                 }
                     var displayResponse = InspectResponse(api, client.GetResponse().ToArray());
                 MelonLogger.Msg($"[LogNetworkRequests] {api} Response: {displayResponse}");
